@@ -20,11 +20,11 @@ RUN ARCH="$(dpkg --print-architecture)" \
 # Install pnpm globally
 RUN npm install -g pnpm
 
-# Install moltbot (CLI is still named clawdbot until upstream renames)
+# Install OpenClaw (formerly clawdbot/moltbot)
 # Use @latest for newest version, or pin to specific version for reproducible builds
-# Check latest: npm view clawdbot version
-RUN npm install -g clawdbot@latest \
-    && clawdbot --version
+# Check latest: npm view openclaw version
+RUN npm install -g openclaw@latest \
+    && openclaw --version
 
 # Create moltbot directories (paths still use clawdbot until upstream renames)
 # Templates are stored in /root/.clawdbot-templates for initialization
@@ -34,7 +34,7 @@ RUN mkdir -p /root/.clawdbot \
     && mkdir -p /root/clawd/skills
 
 # Copy startup script
-# Build cache bust: 2026-02-06-always-latest
+# Build cache bust: 2026-02-06-openclaw-latest
 COPY start-moltbot.sh /usr/local/bin/start-moltbot.sh
 RUN chmod +x /usr/local/bin/start-moltbot.sh
 
