@@ -1,5 +1,5 @@
 {
-  "name": "moltbot-sandbox-working",
+  "name": "moltbot-sandbox",
   "version": "1.0.0",
   "type": "module",
   "private": true,
@@ -37,7 +37,7 @@
     "wrangler": "^4.50.0"
   },
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "cloudflare": {
     "bindings": {
       "ANTHROPIC_API_KEY": {
