@@ -107,17 +107,43 @@ describe('mountR2Storage', () => {
       );
     });
 
-    it('returns true immediately when bucket is already mounted', async () => {
-      const { sandbox, mountBucketMock } = createMockSandbox({ mounted: true });
+    it('returns true when Sandbox API says mount path is already in use', async () => {
+      const { sandbox, mountBucketMock, startProcessMock } = createMockSandbox();
+      // Sandbox API throws "already in use" — means the bucket IS mounted
+      mountBucketMock.mockRejectedValue(
+        new Error('InvalidMountConfigError: Mount path "/data/moltbot" is already in use by bucket "moltbot-data". Unmount the existing bucket first or use a different mount path.')
+      );
+      // isR2Accessible check returns success
+      startProcessMock.mockResolvedValue(createMockProcess('accessible'));
+      
       const env = createMockEnvWithR2();
 
       const result = await mountR2Storage(sandbox, env);
 
       expect(result).toBe(true);
-      expect(mountBucketMock).not.toHaveBeenCalled();
       expect(console.log).toHaveBeenCalledWith(
         'R2 bucket already mounted at',
-        '/data/moltbot'
+        '/data/moltbot',
+        '(confirmed by Sandbox API)'
+      );
+    });
+
+    it('returns true even when filesystem check fails for already-in-use mount', async () => {
+      const { sandbox, mountBucketMock, startProcessMock } = createMockSandbox();
+      mountBucketMock.mockRejectedValue(
+        new Error('InvalidMountConfigError: Mount path "/data/moltbot" is already in use by bucket "moltbot-data".')
+      );
+      // isR2Accessible check fails (filesystem not ready yet)
+      startProcessMock.mockResolvedValue(createMockProcess(''));
+      
+      const env = createMockEnvWithR2();
+
+      const result = await mountR2Storage(sandbox, env);
+
+      // Still returns true — Sandbox API is source of truth
+      expect(result).toBe(true);
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('filesystem check failed')
       );
     });
 
@@ -134,12 +160,9 @@ describe('mountR2Storage', () => {
   });
 
   describe('error handling', () => {
-    it('returns false when mountBucket throws and mount check fails', async () => {
-      const { sandbox, mountBucketMock, startProcessMock } = createMockSandbox({ mounted: false });
-      mountBucketMock.mockRejectedValue(new Error('Mount failed'));
-      startProcessMock
-        .mockResolvedValueOnce(createMockProcess(''))
-        .mockResolvedValueOnce(createMockProcess(''));
+    it('returns false when mountBucket throws a non-mount-conflict error', async () => {
+      const { sandbox, mountBucketMock } = createMockSandbox({ mounted: false });
+      mountBucketMock.mockRejectedValue(new Error('Network timeout'));
       
       const env = createMockEnvWithR2();
 
@@ -152,20 +175,19 @@ describe('mountR2Storage', () => {
       );
     });
 
-    it('returns true if mount fails but check shows it is actually mounted', async () => {
-      const { sandbox, mountBucketMock, startProcessMock } = createMockSandbox();
-      startProcessMock
-        .mockResolvedValueOnce(createMockProcess(''))
-        .mockResolvedValueOnce(createMockProcess('s3fs on /data/moltbot type fuse.s3fs\n'));
-      
-      mountBucketMock.mockRejectedValue(new Error('Transient error'));
+    it('returns false when credentials are invalid', async () => {
+      const { sandbox, mountBucketMock } = createMockSandbox({ mounted: false });
+      mountBucketMock.mockRejectedValue(new Error('InvalidAccessKeyId'));
       
       const env = createMockEnvWithR2();
 
       const result = await mountR2Storage(sandbox, env);
 
-      expect(result).toBe(true);
-      expect(console.log).toHaveBeenCalledWith('R2 bucket is mounted despite error');
+      expect(result).toBe(false);
+      expect(console.error).toHaveBeenCalledWith(
+        'R2 mount error:',
+        'InvalidAccessKeyId'
+      );
     });
   });
 });

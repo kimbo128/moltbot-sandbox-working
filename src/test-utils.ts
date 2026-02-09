@@ -54,19 +54,29 @@ export interface MockSandbox {
 
 /**
  * Create a mock sandbox with configurable behavior
+ * 
+ * When mounted: true, mountBucket will throw "already in use" (simulating
+ * the Sandbox API knowing the bucket is already mounted) and startProcess 
+ * will return "accessible" for the isR2Accessible check.
+ * 
+ * When mounted: false (default), mountBucket resolves successfully.
  */
 export function createMockSandbox(options: { 
   mounted?: boolean;
   processes?: Partial<Process>[];
 } = {}): MockSandbox {
-  const mountBucketMock = vi.fn().mockResolvedValue(undefined);
+  const mountBucketMock = options.mounted
+    ? vi.fn().mockRejectedValue(new Error(
+        'InvalidMountConfigError: Mount path "/data/moltbot" is already in use by bucket "moltbot-data". Unmount the existing bucket first or use a different mount path.'
+      ))
+    : vi.fn().mockResolvedValue(undefined);
   const listProcessesMock = vi.fn().mockResolvedValue(options.processes || []);
   const containerFetchMock = vi.fn();
   
-  // Default: return empty stdout (not mounted), unless mounted: true
+  // Default: return "accessible" if mounted (for isR2Accessible check), empty otherwise
   const startProcessMock = vi.fn().mockResolvedValue(
     options.mounted 
-      ? createMockProcess('s3fs on /data/moltbot type fuse.s3fs (rw,nosuid,nodev,relatime,user_id=0,group_id=0)\n')
+      ? createMockProcess('accessible')
       : createMockProcess('')
   );
   
